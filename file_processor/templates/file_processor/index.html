@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Convertisseur Excel vers PowerPoint</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Convertisseur Excel vers PowerPoint</h1>
+            <p>Déposez votre fichier Excel pour générer des présentations PowerPoint triées par colonne</p>
+        </header>
+
+        <main>
+            <div class="upload-section">
+                <div class="drop-zone" id="dropZone">
+                    <div class="drop-zone-content">
+                        <div class="upload-icon">📁</div>
+                        <h3>Glissez-déposez votre fichier Excel ici</h3>
+                        <p>ou</p>
+                        <button type="button" class="btn-select" onclick="document.getElementById('fileInput').click()">
+                            Sélectionner un fichier
+                        </button>
+                        <input type="file" id="fileInput" accept=".xlsx,.xls" style="display: none;">
+                        <p class="file-info">Formats acceptés: .xlsx, .xls</p>
+                    </div>
+                </div>
+
+                <div class="file-selected" id="fileSelected" style="display: none;">
+                    <div class="selected-file-info">
+                        <span class="file-icon">📄</span>
+                        <span class="file-name" id="fileName"></span>
+                        <button type="button" class="btn-remove" onclick="removeFile()">✕</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sort-section" id="sortSection" style="display: none;">
+                <h3>Choisissez la colonne de tri</h3>
+                <div class="sort-options">
+                    <label class="radio-option">
+                        <input type="radio" name="sortColumn" value="code site" checked>
+                        <span class="radio-custom"></span>
+                        Code Site
+                    </label>
+                    <label class="radio-option">
+                        <input type="radio" name="sortColumn" value="DR IAm">
+                        <span class="radio-custom"></span>
+                        DR IAm
+                    </label>
+                    <label class="radio-option">
+                        <input type="radio" name="sortColumn" value="ville">
+                        <span class="radio-custom"></span>
+                        Ville
+                    </label>
+                    <label class="radio-option">
+                        <input type="radio" name="sortColumn" value="ST FO">
+                        <span class="radio-custom"></span>
+                        ST FO
+                    </label>
+                </div>
+                
+                <button type="button" class="btn-process" onclick="processFile()">
+                    Générer les PowerPoints
+                </button>
+            </div>
+
+            <div class="stats-section" id="statsSection" style="display: none;">
+                <h3>📊 Informations sur le fichier</h3>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalRows">0</div>
+                        <div class="stat-label">Total de lignes</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="primaryCount">0</div>
+                        <div class="stat-label" id="primaryLabel">Nombre de DR</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="groupCount">0</div>
+                        <div class="stat-label">Groupes générés</div>
+                    </div>
+                </div>
+
+                <div class="details-section">
+                    <div class="detail-card">
+                        <h4 id="primaryTitle">🏢 Répartition par DR IAm</h4>
+                        <div class="primary-list" id="primaryList"></div>
+                    </div>
+
+                    <div class="detail-card">
+                        <h4 id="sortTitle">📋 Répartition par colonne</h4>
+                        <div class="sort-list" id="sortList"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="loading" id="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Traitement en cours...</p>
+            </div>
+
+            <div class="results" id="results" style="display: none;">
+                <h3>Fichiers générés</h3>
+                <div class="files-list" id="filesList"></div>
+            </div>
+
+            <div class="error" id="error" style="display: none;">
+                <h3>Erreur</h3>
+                <p id="errorMessage"></p>
+            </div>
+        </main>
+    </div>
+
+    <script src="{% static 'js/main.js' %}"></script>
+</body>
+</html>

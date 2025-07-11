@@ -12,7 +12,7 @@ body {
 }
 
 .container {
-    max-width: 800px;
+    max-width: 1000px;
     margin: 0 auto;
     background: white;
     border-radius: 15px;
@@ -47,12 +47,14 @@ main {
 }
 
 .drop-zone {
-    border: 3px dashed #ddd;
-    border-radius: 10px;
-    padding: 60px 20px;
+    border: 4px dashed #ddd;
+    border-radius: 8px;
+    padding: 25px 15px;
     text-align: center;
     transition: all 0.3s ease;
     cursor: pointer;
+    max-width: 500px;
+    margin: 0 auto;
 }
 
 .drop-zone:hover,
@@ -62,19 +64,21 @@ main {
 }
 
 .drop-zone-content .upload-icon {
-    font-size: 4em;
-    margin-bottom: 20px;
+    font-size: 2.2em;
+    margin-bottom: 8px;
 }
 
 .drop-zone-content h3 {
     color: #333;
-    margin-bottom: 15px;
+    margin-bottom: 5px;
     font-weight: 500;
+    font-size: 1.1em;
 }
 
 .drop-zone-content p {
     color: #666;
-    margin: 10px 0;
+    margin: 3px 0;
+    font-size: 0.9em;
 }
 
 .btn-select {
@@ -151,20 +155,24 @@ main {
 
 .sort-options {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 15px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
     margin-bottom: 30px;
+    width: 100%;
 }
 
 .radio-option {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     cursor: pointer;
-    padding: 15px;
+    padding: 12px 10px;
     background: white;
     border-radius: 8px;
     transition: all 0.2s ease;
+    text-align: center;
+    justify-content: center;
+    min-width: 0;
 }
 
 .radio-option:hover {
@@ -233,18 +241,24 @@ main {
 
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 20px;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
     margin-bottom: 30px;
+    width: 100%;
+    grid-auto-flow: column;
+    overflow: visible;
 }
 
 .stat-card {
     background: white;
-    padding: 25px;
+    padding: 15px 10px;
     border-radius: 12px;
     text-align: center;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     transition: transform 0.2s ease;
+    min-width: 0;
+    max-width: 100%;
+    flex-shrink: 0;
 }
 
 .stat-card:hover {
@@ -252,16 +266,17 @@ main {
 }
 
 .stat-number {
-    font-size: 2.5em;
+    font-size: 2.2em;
     font-weight: bold;
     color: #1976d2;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 
 .stat-label {
     color: #666;
-    font-size: 0.95em;
+    font-size: 0.85em;
     font-weight: 500;
+    line-height: 1.2;
 }
 
 .details-section {
@@ -408,12 +423,30 @@ main {
     }
 
     .sort-options {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+    }
+
+    .radio-option {
+        padding: 10px 6px;
+        font-size: 0.9em;
     }
 
     .stats-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 15px;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+    }
+
+    .stat-card {
+        padding: 12px 8px;
+    }
+
+    .stat-number {
+        font-size: 1.8em;
+    }
+
+    .stat-label {
+        font-size: 0.75em;
     }
 
     .stat-card {

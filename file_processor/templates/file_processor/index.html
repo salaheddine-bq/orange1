@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Convertisseur Excel vers PowerPoint</title>
+    <title>Gestion des autorisations d'accès</title>
     {% load static %}
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>Convertisseur Excel vers PowerPoint</h1>
-            <p>Déposez votre fichier Excel pour générer des présentations PowerPoint triées par colonne</p>
+            <h1>Gestion des autorisations d'accès</h1>
+            <p>Déposez votre fichier Excel pour générer des autorisations d'accès </p>
         </header>
 
         <main>
@@ -27,13 +27,13 @@
                         <input type="file" id="fileInput" accept=".xlsx,.xls" style="display: none;">
                         <p class="file-info">Formats acceptés: .xlsx, .xls</p>
                     </div>
-                </div>
+                </div> <br>
 
                 <div class="file-selected" id="fileSelected" style="display: none;">
                     <div class="selected-file-info">
                         <span class="file-icon">📄</span>
                         <span class="file-name" id="fileName"></span>
-                        <button type="button" class="btn-remove" onclick="removeFile()">✕</button>
+                        <button type="button" class="btn-remove" onclick="removeFile()">×</button>
                     </div>
                 </div>
             </div>
@@ -47,9 +47,9 @@
                         Code Site
                     </label>
                     <label class="radio-option">
-                        <input type="radio" name="sortColumn" value="DR IAm">
+                        <input type="radio" name="sortColumn" value="DR IAM">
                         <span class="radio-custom"></span>
-                        DR IAm
+                        DR IAM
                     </label>
                     <label class="radio-option">
                         <input type="radio" name="sortColumn" value="ville">
@@ -64,7 +64,7 @@
                 </div>
                 
                 <button type="button" class="btn-process" onclick="processFile()">
-                    Générer les PowerPoints
+                    Générer les autorisations d'accès
                 </button>
             </div>
 
@@ -83,11 +83,19 @@
                         <div class="stat-number" id="groupCount">0</div>
                         <div class="stat-label">Groupes générés</div>
                     </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="fileCount">0</div>
+                        <div class="stat-label">Fichiers générés</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="fileSize">0</div>
+                        <div class="stat-label">Taille fichier</div>
+                    </div>
                 </div>
 
                 <div class="details-section">
                     <div class="detail-card">
-                        <h4 id="primaryTitle">🏢 Répartition par DR IAm</h4>
+                        <h4 id="primaryTitle">🏢 Répartition par DR IAM</h4>
                         <div class="primary-list" id="primaryList"></div>
                     </div>
 

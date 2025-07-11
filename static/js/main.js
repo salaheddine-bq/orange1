@@ -118,6 +118,8 @@ function showStats(stats) {
     document.getElementById('primaryCount').textContent = stats.primary_count;
     document.getElementById('primaryLabel').textContent = `Nombre de ${stats.primary_label}${stats.primary_count > 1 ? 's' : ''}`;
     document.getElementById('groupCount').textContent = stats.group_count;
+    document.getElementById('fileCount').textContent = stats.file_count;
+    document.getElementById('fileSize').textContent = stats.file_size;
 
     // Gérer l'affichage des détails selon show_details
     const detailsSection = document.querySelector('.details-section');
@@ -162,12 +164,19 @@ function showStats(stats) {
     const sortTitle = document.getElementById('sortTitle');
     const sortCard = sortList.closest('.detail-card');
 
-    if (stats.sort_column === stats.primary_label ||
-        (stats.sort_column === 'DR IAm' && stats.primary_label === 'DR')) {
-        // Masquer la section de tri si c'est la même que la principale
+    if (stats.sort_column === 'DR IAM') {
+        // Masquer complètement la section de tri si on trie par DR IAM (éviter la duplication)
         sortCard.style.display = 'none';
+        sortCard.style.visibility = 'hidden';
+        sortCard.style.height = '0';
+        sortCard.style.overflow = 'hidden';
+
     } else {
+        // Restaurer l'affichage normal de la section de tri
         sortCard.style.display = 'block';
+        sortCard.style.visibility = 'visible';
+        sortCard.style.height = 'auto';
+        sortCard.style.overflow = 'visible';
         sortTitle.textContent = `📋 Répartition par ${stats.sort_column}`;
 
         sortList.innerHTML = '';

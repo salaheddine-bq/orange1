@@ -258,9 +258,9 @@ main {
 
 .visit-fields {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
     gap: 20px;
-    align-items: end;
+    align-items: stretch;
 }
 
 .field-group {
@@ -269,10 +269,7 @@ main {
     position: relative;
 }
 
-.field-group:last-child {
-    grid-column: 1 / -1;
-    margin-top: 8px;
-}
+/* Tous les champs sont maintenant sur une seule colonne */
 
 .field-group label {
     color: #4a5568;
@@ -313,6 +310,7 @@ main {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    width: 45%;
 }
 
 .date-input:hover, .text-input:hover {
@@ -329,7 +327,6 @@ main {
 }
 
 .text-input {
-    width: 100%;
     resize: vertical;
     min-height: 48px;
 }
@@ -383,13 +380,7 @@ main {
     }
 
     .visit-fields {
-        grid-template-columns: 1fr;
         gap: 16px;
-    }
-
-    .field-group:last-child {
-        grid-column: 1;
-        margin-top: 4px;
     }
 
     .date-input, .text-input {

@@ -25,6 +25,11 @@ def upload_file(request):
     file = request.FILES['file']
     sort_column = request.POST.get('sort_column', 'code site')
 
+    # Récupérer les informations de visite
+    date_debut = request.POST.get('date_debut', '')
+    date_fin = request.POST.get('date_fin', '')
+    objet_visite = request.POST.get('objet_visite', '')
+
     # Vérifier l'extension du fichier
     if not file.name.endswith(('.xlsx', '.xls')):
         return JsonResponse({'error': 'Le fichier doit être un fichier Excel (.xlsx ou .xls)'}, status=400)
@@ -110,24 +115,58 @@ def upload_file(request):
         # Statistiques par colonne de tri
         sort_stats = df[sort_column].value_counts().to_dict()
 
-        # Adapter les statistiques selon la colonne choisie
+        # Adapter les statistiques selon la colonne choisie avec détails enrichis
         if sort_column == 'DR IAM':
-            # Pour DR IAM : afficher DR stats
-            primary_stats = df['DR IAM'].value_counts().to_dict()
+            # Pour DR IAM : afficher DR stats avec ST FO et fichiers
+            primary_stats = {}
+            for dr_name in df['DR IAM'].unique():
+                dr_data = df[df['DR IAM'] == dr_name]
+                lines_count = len(dr_data)
+                st_fo_count = len(dr_data['ST FO'].unique())
+                # Estimer le nombre de fichiers (basé sur 19 lignes max par fichier)
+                files_count = max(1, (lines_count + 18) // 19)  # Arrondi vers le haut
+                primary_stats[dr_name] = {
+                    'lines': lines_count,
+                    'st_fo': st_fo_count,
+                    'files': files_count
+                }
             primary_count = len(primary_stats)
             primary_label = 'DR'
             stats_title = 'Répartition par DR IAM'
             show_details = True
         elif sort_column == 'ville':
-            # Pour ville : afficher ville stats
-            primary_stats = df['ville'].value_counts().to_dict()
+            # Pour ville : afficher ville stats avec ST FO et fichiers
+            primary_stats = {}
+            for ville_name in df['ville'].unique():
+                ville_data = df[df['ville'] == ville_name]
+                lines_count = len(ville_data)
+                st_fo_count = len(ville_data['ST FO'].unique())
+                # Estimer le nombre de fichiers (basé sur 19 lignes max par fichier)
+                files_count = max(1, (lines_count + 18) // 19)  # Arrondi vers le haut
+                primary_stats[ville_name] = {
+                    'lines': lines_count,
+                    'st_fo': st_fo_count,
+                    'files': files_count
+                }
             primary_count = len(primary_stats)
             primary_label = 'ville'
             stats_title = 'Répartition par ville'
             show_details = True
         elif sort_column == 'ST FO':
-            # Pour ST FO : afficher ST FO stats
-            primary_stats = df['ST FO'].value_counts().to_dict()
+            # Pour ST FO : afficher ST FO stats avec lignes et fichiers
+            primary_stats = {}
+            for st_fo_name in df['ST FO'].unique():
+                st_fo_data = df[df['ST FO'] == st_fo_name]
+                lines_count = len(st_fo_data)
+                # Pour ST FO, le nombre de ST FO est toujours 1
+                st_fo_count = 1
+                # Estimer le nombre de fichiers (basé sur 19 lignes max par fichier)
+                files_count = max(1, (lines_count + 18) // 19)  # Arrondi vers le haut
+                primary_stats[st_fo_name] = {
+                    'lines': lines_count,
+                    'st_fo': st_fo_count,
+                    'files': files_count
+                }
             primary_count = len(primary_stats)
             primary_label = 'ST FO'
             stats_title = 'Répartition par ST FO'
@@ -140,16 +179,20 @@ def upload_file(request):
             stats_title = ''
             show_details = False
 
-        # Éviter la duplication des statistiques si on trie par DR IAM
-        if sort_column == 'DR IAM':
+        # Éviter la duplication des statistiques pour DR IAM, ville et ST FO
+        if sort_column in ['DR IAM', 'ville', 'ST FO']:
             # Ne pas envoyer sort_stats pour éviter la duplication
             final_sort_stats = {}
         else:
             final_sort_stats = sort_stats
 
+        # Calculer le total des ST FO uniques dans le fichier
+        total_st_fo = len(df['ST FO'].unique())
+
         # Statistiques générales
         stats = {
             'total_rows': total_rows,
+            'total_st_fo': total_st_fo,
             'primary_count': primary_count,
             'primary_stats': primary_stats,
             'primary_label': primary_label,
@@ -185,8 +228,11 @@ def upload_file(request):
             ppt_path = os.path.join(output_dir, ppt_filename)
 
             # Créer les présentations PowerPoint (peut créer plusieurs fichiers)
-            created_files = create_powerpoint(group_df, ppt_path, group_name, sort_column)
+            created_files = create_powerpoint(group_df, ppt_path, group_name, sort_column, date_debut, date_fin, objet_visite)
             generated_files.extend(created_files)
+
+        # Extraire les noms de fichiers pour la compatibilité
+        file_names = [file_info['filename'] for file_info in generated_files]
 
         # Ajouter le nombre de fichiers générés aux statistiques
         stats['file_count'] = len(generated_files)
@@ -194,93 +240,17 @@ def upload_file(request):
         return JsonResponse({
             'success': True,
             'message': f'{len(generated_files)} fichiers PowerPoint générés',
-            'files': generated_files,
+            'files': file_names,
+            'files_details': generated_files,  # Nouvelle clé avec détails
             'stats': stats
         })
 
     except Exception as e:
         return JsonResponse({'error': f'Erreur lors du traitement: {str(e)}'}, status=500)
 
-def load_prestataire_sheets():
-    """Charge toutes les feuilles du fichier Excel 'Liste prestataire'"""
-    try:
-        # Chercher le fichier Liste prestataire dans le répertoire courant
-        prestataire_files = [
-            'Liste prestataire.xlsx',
-            'Liste prestataire.xls',
-            'liste prestataire.xlsx',
-            'liste prestataire.xls'
-        ]
 
-        for filename in prestataire_files:
-            if os.path.exists(filename):
-                # Lire toutes les feuilles du fichier Excel
-                all_sheets = pd.read_excel(filename, sheet_name=None)
-                print(f"📋 Fichier prestataires trouvé: {filename}")
-                print(f"📊 Feuilles disponibles: {list(all_sheets.keys())}")
 
-                # Afficher un aperçu de chaque feuille
-                for sheet_name, df in all_sheets.items():
-                    print(f"   📄 Feuille '{sheet_name}': {len(df)} lignes, colonnes: {list(df.columns)}")
-
-                return all_sheets
-
-        print("⚠️ Aucun fichier 'Liste prestataire' trouvé")
-        return None
-    except Exception as e:
-        print(f"❌ Erreur lors du chargement des prestataires: {e}")
-        return None
-
-def get_prestataire_sheets_for_st_fo(all_sheets, st_fo_list):
-    """Récupère les feuilles correspondantes aux ST FO donnés"""
-    if all_sheets is None:
-        return {}
-
-    try:
-        matching_sheets = {}
-
-        print(f"🔍 Recherche de feuilles pour ST FO: {st_fo_list}")
-        print(f"📋 Feuilles disponibles: {list(all_sheets.keys())}")
-
-        for st_fo in st_fo_list:
-            if pd.notna(st_fo) and str(st_fo).strip():
-                st_fo_clean = str(st_fo).strip()
-                found = False
-
-                # Chercher une feuille qui correspond EXACTEMENT au nom du ST FO
-                for sheet_name, df_sheet in all_sheets.items():
-                    sheet_name_clean = str(sheet_name).strip()
-
-                    # Correspondance exacte (insensible à la casse)
-                    if st_fo_clean.lower() == sheet_name_clean.lower():
-                        print(f"✅ Correspondance exacte trouvée: '{st_fo_clean}' → feuille '{sheet_name_clean}'")
-                        matching_sheets[st_fo_clean] = {
-                            'sheet_name': sheet_name_clean,
-                            'dataframe': df_sheet
-                        }
-                        found = True
-                        break
-
-                    # Correspondance partielle (ST FO contenu dans le nom de la feuille)
-                    elif st_fo_clean.lower() in sheet_name_clean.lower():
-                        print(f"✅ Correspondance partielle trouvée: '{st_fo_clean}' → feuille '{sheet_name_clean}'")
-                        matching_sheets[st_fo_clean] = {
-                            'sheet_name': sheet_name_clean,
-                            'dataframe': df_sheet
-                        }
-                        found = True
-                        break
-
-                if not found:
-                    print(f"⚠️ Aucune feuille trouvée pour ST FO: '{st_fo_clean}' - IGNORÉ")
-
-        print(f"📊 Résultat: {len(matching_sheets)} feuilles trouvées sur {len(st_fo_list)} ST FO")
-        return matching_sheets
-    except Exception as e:
-        print(f"❌ Erreur lors de la récupération des feuilles: {e}")
-        return {}
-
-def create_powerpoint(df, output_path, group_name, sort_column):
+def create_powerpoint(df, output_path, group_name, sort_column, date_debut='', date_fin='', objet_visite=''):
     """Crée des présentations PowerPoint à partir des données avec division en fichiers (max 19 lignes par fichier)"""
     from pptx.dml.color import RGBColor
     from pptx.util import Pt, Cm
@@ -297,8 +267,8 @@ def create_powerpoint(df, output_path, group_name, sort_column):
         'X Arrivée ERPT Proposition1 - Y Arrivée'
     ]
 
-    # Chemin vers l'image AA
-    image_path = 'AA.jpeg'
+    # Chemin vers l'image AAA
+    image_path = 'AAA.jpeg'
     image_exists = os.path.exists(image_path)
 
     # Créer une copie du DataFrame pour éviter de modifier l'original
@@ -466,7 +436,7 @@ def create_powerpoint(df, output_path, group_name, sort_column):
         chunk_st_fo_name = chunk_names[chunk_index]
         chunk_lines = len(chunk_data)
 
-        # Slide de titre
+        # Slide de titre avec modifications CSS simples
         title_slide_layout = prs.slide_layouts[0]
         slide = prs.slides.add_slide(title_slide_layout)
         title = slide.shapes.title
@@ -475,31 +445,119 @@ def create_powerpoint(df, output_path, group_name, sort_column):
         title.text = f"Données pour {sort_column}: {group_name} - {chunk_st_fo_name}"
         subtitle.text = f"Lignes: {chunk_lines} | ST FO: {chunk_st_fo_name}"
 
-        # Appliquer la police Arial Narrow au titre
+        # Appliquer la police Arial Narrow au titre avec style amélioré
         title_paragraph = title.text_frame.paragraphs[0]
         title_paragraph.font.name = 'Arial Narrow'
         title_paragraph.font.size = Pt(32)
+        title_paragraph.font.bold = True
+        title_paragraph.font.color.rgb = RGBColor(0, 0, 0)  # Noir
 
         subtitle_paragraph = subtitle.text_frame.paragraphs[0]
         subtitle_paragraph.font.name = 'Arial Narrow'
         subtitle_paragraph.font.size = Pt(18)
-        # Slide avec l'image AA et le tableau en dessous (sans titre)
+        subtitle_paragraph.font.color.rgb = RGBColor(64, 64, 64)  # Gris foncé
+
+        # Ajouter une bordure noire autour du slide (diminuée de 4cm largeur et 4cm hauteur)
+        try:
+            # Créer un rectangle de bordure réduit
+            from pptx.enum.shapes import MSO_SHAPE
+            left = Cm(2.2)    # 2cm de plus de chaque côté (0.2 + 2.0)
+            top = Cm(2.2)     # 2cm de plus de chaque côté (0.2 + 2.0)
+            width = Cm(21.2)  # Largeur réduite de 4cm (25.2 - 4.0)
+            height = Cm(14.8) # Hauteur réduite de 4cm (18.8 - 4.0)
+
+            border_shape = slide.shapes.add_shape(
+                MSO_SHAPE.RECTANGLE, left, top, width, height
+            )
+
+            # Style de la bordure
+            border_fill = border_shape.fill
+            border_fill.background()  # Fond transparent
+
+            border_line = border_shape.line
+            border_line.color.rgb = RGBColor(0, 0, 0)  # Bordure noire
+            border_line.width = Pt(3)  # Épaisseur 3pt
+
+            # Envoyer la bordure à l'arrière-plan
+            border_shape.element.getparent().remove(border_shape.element)
+            slide.shapes._spTree.insert(2, border_shape.element)
+
+        except Exception as e:
+            # Si erreur avec la bordure, continuer sans
+            pass
+        # Slide avec l'image AAA et le tableau en dessous (sans titre)
         blank_slide_layout = prs.slide_layouts[6]  # Layout vide sans titre
         data_slide = prs.slides.add_slide(blank_slide_layout)
 
-        # Ajouter l'image AA si elle existe
+        # Ajouter l'image AAA si elle existe
         if image_exists:
             try:
                 # Positionner l'image tout en haut de la slide (sans titre)
                 left = Cm(1.0)
                 top = Cm(0.5)  # Tout en haut avec petite marge
-                width = Cm(26.0)  # Largeur adaptée à la slide
+                width = Cm(24.5)  # Largeur diminuée de 1.5cm (26.0 - 1.5 = 24.5)
                 height = Cm(7.0)  # Hauteur réduite pour laisser plus de place au tableau
 
                 data_slide.shapes.add_picture(image_path, left, top, width, height)
             except Exception as e:
                 # Si erreur avec l'image, continuer sans l'image
                 pass
+
+        # Ajouter les informations de visite EN AVANT-PLAN sur l'image AAA
+        print(f"🔍 Debug: date_debut='{date_debut}', date_fin='{date_fin}', objet_visite='{objet_visite}'")
+
+        if date_debut or date_fin or objet_visite:
+            print("✅ Ajout des informations de visite en avant-plan")
+
+            # Formater les dates au format DD/MM/YYYY
+            def format_date(date_str):
+                if date_str:
+                    try:
+                        from datetime import datetime
+                        # Convertir de YYYY-MM-DD vers DD/MM/YYYY
+                        date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+                        return date_obj.strftime('%d/%m/%Y')
+                    except:
+                        return date_str
+                return ',,/,,/,,,,'
+
+            date_debut_formatted = format_date(date_debut)
+            date_fin_formatted = format_date(date_fin)
+            objet_formatted = f'"{objet_visite}"' if objet_visite else '""'
+
+            # Créer le texte dans le format exact demandé
+            visit_info_text = f"{date_debut_formatted}         {date_fin_formatted}                                              {objet_formatted}"
+            print(f"📝 Texte à afficher: '{visit_info_text}'")
+
+            # Ajouter la zone de texte EN AVANT-PLAN sur l'image AAA
+            # Position ajustée : descendre de 0.2cm supplémentaire
+            text_left = Cm(4.7)   # Pousser à gauche 0.3cm (inchangé)
+            text_top = Cm(6.98)   # Descendre de 0.2cm (6.78 + 0.2 = 6.98)
+            text_width = Cm(24.0) # Largeur adaptée à l'image
+            text_height = Cm(1.2) # Hauteur suffisante pour le texte
+
+            try:
+                text_box = data_slide.shapes.add_textbox(text_left, text_top, text_width, text_height)
+                text_frame = text_box.text_frame
+                text_frame.text = visit_info_text
+
+                # Style du texte pour visibilité sur l'image
+                paragraph = text_frame.paragraphs[0]
+                paragraph.font.name = 'Arial Narrow'
+                paragraph.font.size = Pt(9)  # Taille réduite à 9pt
+                paragraph.font.bold = False  # Pas de gras
+                paragraph.font.color.rgb = RGBColor(0, 0, 0)  # Texte noir
+
+                # Fond TRANSPARENT (pas de fond)
+                fill = text_box.fill
+                fill.background()  # Fond transparent
+
+                print("✅ Zone de texte ajoutée avec succès en avant-plan")
+
+            except Exception as e:
+                print(f"❌ Erreur lors de l'ajout de la zone de texte: {e}")
+        else:
+            print("⚠️ Aucune information de visite à afficher")
 
         # Ajouter le tableau en dessous de l'image pour ce chunk
         rows = len(chunk_data) + 1  # +1 pour l'en-tête
@@ -508,10 +566,11 @@ def create_powerpoint(df, output_path, group_name, sort_column):
         # Calculer la largeur totale nécessaire (somme des largeurs de colonnes)
         total_width_cm = 1.8 + 2.4 + 3.7 + 2.6 + 2.8 + 6.2 + 4.8  # = 24.3 cm
 
-        # Positionner le tableau DIRECTEMENT collé à l'image (aucun espace)
+        # Positionner le tableau DIRECTEMENT en dessous de l'image
+        # (les informations de visite sont maintenant en avant-plan sur l'image)
         left = Cm(1.0)  # Marge à gauche
         if image_exists:
-            top = Cm(7.5)  # DIRECTEMENT collé à l'image (0.5 + 7.0 + 0.0 espace)
+            top = Cm(7.5)  # DIRECTEMENT collé à l'image
         else:
             top = Cm(1.0)   # Plus haut si pas d'image
         width = Cm(total_width_cm)  # Largeur exacte du tableau
@@ -589,184 +648,7 @@ def create_powerpoint(df, output_path, group_name, sort_column):
             else:  # Toutes les lignes de données
                 row.height = Cm(0.05)  # Toutes les données: 0.05 cm
 
-        # Ajouter le 3ème slide avec la liste des prestataires
-        try:
-            # Charger toutes les feuilles du fichier prestataires
-            all_sheets = load_prestataire_sheets()
 
-            if all_sheets is not None:
-                # Récupérer les ST FO uniques de ce chunk
-                st_fo_list = chunk_data['ST FO'].dropna().unique().tolist()
-
-                # Récupérer les feuilles correspondantes aux ST FO
-                matching_sheets = get_prestataire_sheets_for_st_fo(all_sheets, st_fo_list)
-
-                if matching_sheets:
-                    # Créer le 3ème slide pour chaque ST FO trouvé
-                    for st_fo, sheet_info in matching_sheets.items():
-                        prestataire_slide_layout = prs.slide_layouts[6]  # Layout vide
-                        prestataire_slide = prs.slides.add_slide(prestataire_slide_layout)
-
-                        # Ajouter le titre manuellement
-                        title_shape = prestataire_slide.shapes.add_textbox(
-                            Cm(1), Cm(1), Cm(23), Cm(2)
-                        )
-                        title_frame = title_shape.text_frame
-                        title_frame.text = f"Liste des Prestataires - {st_fo}"
-                        title_paragraph = title_frame.paragraphs[0]
-                        title_paragraph.font.name = 'Arial Narrow'
-                        title_paragraph.font.size = Pt(24)
-                        title_paragraph.font.bold = True
-
-                        # Récupérer le DataFrame de la feuille
-                        df_sheet = sheet_info['dataframe']
-
-                        # Nettoyer le DataFrame (supprimer les lignes/colonnes vides)
-                        df_sheet = df_sheet.dropna(how='all').dropna(axis=1, how='all')
-
-                        # Filtrer pour ne garder que les colonnes "nom et prenom" et "CIN"
-                        df_filtered = pd.DataFrame()
-
-                        if not df_sheet.empty:
-                            print(f"📋 Analyse de la feuille '{st_fo}': {len(df_sheet)} lignes")
-                            print(f"📊 Colonnes disponibles: {list(df_sheet.columns)}")
-
-                            # Normaliser les noms de colonnes pour la recherche
-                            df_sheet.columns = df_sheet.columns.astype(str)
-
-                            # Chercher la colonne "nom et prenom" (variations possibles)
-                            nom_col = None
-                            for col in df_sheet.columns:
-                                col_lower = str(col).lower().strip()
-                                # Recherche plus précise pour "nom et prenom"
-                                if ('nom et prenom' in col_lower or
-                                    'nom et prénom' in col_lower or
-                                    'nom_et_prenom' in col_lower or
-                                    col_lower == 'nom' or
-                                    'nom complet' in col_lower):
-                                    nom_col = col
-                                    print(f"✅ Colonne nom trouvée: '{col}'")
-                                    break
-
-                            # Chercher la colonne "CIN" (variations possibles)
-                            cin_col = None
-                            for col in df_sheet.columns:
-                                col_lower = str(col).lower().strip()
-                                # Recherche plus précise pour "CIN"
-                                if (col_lower == 'cin' or
-                                    'c.i.n' in col_lower or
-                                    'carte identite' in col_lower or
-                                    'carte d\'identite' in col_lower or
-                                    'numero cin' in col_lower):
-                                    cin_col = col
-                                    print(f"✅ Colonne CIN trouvée: '{col}'")
-                                    break
-
-                            # Créer le DataFrame filtré avec les colonnes trouvées
-                            if nom_col is not None and cin_col is not None:
-                                # Filtrer les lignes vides
-                                df_temp = df_sheet[[nom_col, cin_col]].copy()
-                                df_temp = df_temp.dropna(how='all')  # Supprimer les lignes complètement vides
-
-                                if not df_temp.empty:
-                                    df_filtered = df_temp.copy()
-                                    df_filtered.columns = ['Nom et Prénom', 'CIN']  # Renommer pour uniformiser
-                                    print(f"✅ Tableau créé pour {st_fo}: {len(df_filtered)} personnes avec nom et CIN")
-                                else:
-                                    print(f"⚠️ Feuille {st_fo} vide après filtrage")
-                            elif nom_col is not None:
-                                df_temp = df_sheet[[nom_col]].copy().dropna(how='all')
-                                if not df_temp.empty:
-                                    df_filtered = df_temp.copy()
-                                    df_filtered.columns = ['Nom et Prénom']
-                                    print(f"⚠️ Seule la colonne nom disponible pour {st_fo}: {len(df_filtered)} personnes")
-                            elif cin_col is not None:
-                                df_temp = df_sheet[[cin_col]].copy().dropna(how='all')
-                                if not df_temp.empty:
-                                    df_filtered = df_temp.copy()
-                                    df_filtered.columns = ['CIN']
-                                    print(f"⚠️ Seule la colonne CIN disponible pour {st_fo}: {len(df_filtered)} personnes")
-                            else:
-                                print(f"❌ Aucune colonne 'nom et prenom' ou 'CIN' trouvée pour {st_fo}")
-                                print(f"   Colonnes disponibles: {list(df_sheet.columns)}")
-                                print(f"   → Slide ignoré pour ce ST FO")
-                                continue  # Passer au ST FO suivant
-
-                        if not df_filtered.empty:
-                            # Créer un tableau avec les données filtrées (nom et prenom + CIN)
-                            rows, cols = len(df_filtered) + 1, len(df_filtered.columns)  # +1 pour l'en-tête
-
-                            # Ajouter le tableau
-                            table_shape = prestataire_slide.shapes.add_table(
-                                rows, cols, Cm(1), Cm(4), Cm(23), Cm(12)
-                            )
-                            table = table_shape.table
-
-                            # Définir les largeurs de colonnes optimisées pour 2 colonnes
-                            if cols == 2:  # Nom et CIN
-                                table.columns[0].width = Cm(15)  # Nom et Prénom (plus large)
-                                table.columns[1].width = Cm(8)   # CIN (plus étroit)
-                            else:  # Une seule colonne
-                                table.columns[0].width = Cm(23)
-
-                            # Remplir l'en-tête
-                            for col_idx, column_name in enumerate(df_filtered.columns):
-                                cell = table.cell(0, col_idx)
-                                cell.text = str(column_name)
-
-                                # Style de l'en-tête
-                                paragraph = cell.text_frame.paragraphs[0]
-                                paragraph.font.name = 'Arial Narrow'
-                                paragraph.font.size = Pt(12)
-                                paragraph.font.bold = True
-
-                                # Couleur de fond de l'en-tête
-                                fill = cell.fill
-                                fill.solid()
-                                fill.fore_color.rgb = RGBColor(220, 220, 220)
-
-                            # Remplir les données
-                            for row_idx, (_, row_data) in enumerate(df_filtered.iterrows(), 1):
-                                if row_idx >= rows:  # Sécurité
-                                    break
-
-                                for col_idx, value in enumerate(row_data):
-                                    if col_idx >= cols:  # Sécurité
-                                        break
-
-                                    cell = table.cell(row_idx, col_idx)
-                                    cell.text = str(value) if pd.notna(value) else ""
-
-                                    # Style des données
-                                    paragraph = cell.text_frame.paragraphs[0]
-                                    paragraph.font.name = 'Arial Narrow'
-                                    paragraph.font.size = Pt(10)
-
-                            print(f"✅ 3ème slide ajouté pour {st_fo} avec tableau {rows-1}x{cols} (Nom et Prénom + CIN)")
-                        else:
-                            # Si la feuille est vide, ajouter un message
-                            text_shape = prestataire_slide.shapes.add_textbox(
-                                Cm(1), Cm(4), Cm(23), Cm(5)
-                            )
-                            text_frame = text_shape.text_frame
-                            text_frame.text = f"Aucune donnée disponible pour {st_fo}"
-                            paragraph = text_frame.paragraphs[0]
-                            paragraph.font.name = 'Arial Narrow'
-                            paragraph.font.size = Pt(16)
-
-                    print(f"✅ {len(matching_sheets)} slides de prestataires ajoutés")
-                else:
-                    print(f"⚠️ Aucune feuille correspondante trouvée pour les ST FO: {st_fo_list}")
-                    print(f"   ST FO dans le PowerPoint: {st_fo_list}")
-                    print(f"   Feuilles disponibles: {list(all_sheets.keys()) if all_sheets else 'Aucune'}")
-            else:
-                print("⚠️ Fichier 'Liste prestataire' non trouvé dans le répertoire courant")
-                print("   Vérifiez que le fichier 'Liste prestataire.xlsx' est présent")
-                print("   3ème slide non ajouté")
-        except Exception as e:
-            print(f"❌ Erreur lors de la création du 3ème slide: {e}")
-            import traceback
-            print(f"   Détails: {traceback.format_exc()}")
 
         # Sauvegarder ce fichier PowerPoint avec nom basé sur ST FO
         base_name = output_path.replace('.pptx', '')
@@ -775,9 +657,13 @@ def create_powerpoint(df, output_path, group_name, sort_column):
         chunk_output_path = f"{base_name} {safe_st_fo_name}.pptx"
 
         prs.save(chunk_output_path)
-        created_files.append(os.path.basename(chunk_output_path))
+        # Ajouter les informations détaillées du fichier
+        created_files.append({
+            'filename': os.path.basename(chunk_output_path),
+            'lines': len(chunk_data)
+        })
 
-    # Retourner la liste des fichiers créés
+    # Retourner la liste des fichiers créés avec détails
     return created_files
 
 def download_file(request, filename):

@@ -10,7 +10,7 @@
 <body>
     <div class="container">
         <header>
-            <h1>Gestion des autorisations d'accès</h1>
+            <h1><strong> Gestion des autorisations d'accès </strong></h1>
             <p>Déposez votre fichier Excel pour générer des autorisations d'accès </p>
         </header>
 
@@ -62,7 +62,26 @@
                         ST FO
                     </label>
                 </div>
-                
+
+                <!-- Nouveaux champs pour les informations de visite -->
+                <div class="visit-info-section">
+                    <h3>Informations de la visite</h3>
+                    <div class="visit-fields">
+                        <div class="field-group">
+                            <label for="dateDebut">Date de début :</label>
+                            <input type="date" id="dateDebut" name="dateDebut" class="date-input">
+                        </div>
+                        <div class="field-group">
+                            <label for="dateFin">Date de fin :</label>
+                            <input type="date" id="dateFin" name="dateFin" class="date-input">
+                        </div>
+                        <div class="field-group">
+                            <label for="objetVisite">Objet de la visite :</label>
+                            <input type="text" id="objetVisite" name="objetVisite" class="text-input" placeholder="Décrivez l'objet de la visite...">
+                        </div> <br>
+                    </div>
+                </div>
+
                 <button type="button" class="btn-process" onclick="processFile()">
                     Générer les autorisations d'accès
                 </button>
@@ -76,12 +95,12 @@
                         <div class="stat-label">Total de lignes</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-number" id="primaryCount">0</div>
-                        <div class="stat-label" id="primaryLabel">Nombre de DR</div>
+                        <div class="stat-number" id="totalStFo">0</div>
+                        <div class="stat-label">Total ST FO</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-number" id="groupCount">0</div>
-                        <div class="stat-label">Groupes générés</div>
+                        <div class="stat-number" id="primaryCount">0</div>
+                        <div class="stat-label" id="primaryLabel">Nombre de DR</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-number" id="fileCount">0</div>

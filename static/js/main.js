@@ -76,17 +76,30 @@ function processFile() {
         showError('Veuillez sélectionner un fichier');
         return;
     }
-    
+
     const sortColumn = document.querySelector('input[name="sortColumn"]:checked').value;
-    
+
+    // Récupérer les informations de visite
+    const dateDebut = document.getElementById('dateDebut').value;
+    const dateFin = document.getElementById('dateFin').value;
+    const objetVisite = document.getElementById('objetVisite').value;
+
+    // Validation des champs avec feedback visuel
+    if (!validateVisitFields(dateDebut, dateFin, objetVisite)) {
+        return;
+    }
+
     // Afficher le loading
     hideAllSections();
     loading.style.display = 'block';
-    
+
     // Préparer les données pour l'upload
     const formData = new FormData();
     formData.append('file', selectedFile);
     formData.append('sort_column', sortColumn);
+    formData.append('date_debut', dateDebut);
+    formData.append('date_fin', dateFin);
+    formData.append('objet_visite', objetVisite);
     
     // Envoyer la requête
     fetch('/upload/', {
@@ -99,7 +112,7 @@ function processFile() {
 
         if (data.success) {
             showStats(data.stats);
-            showResults(data.files, data.stats.sort_column);
+            showResults(data.files, data.stats.sort_column, data.files_details);
         } else {
             showError(data.error || 'Une erreur est survenue');
         }
@@ -115,9 +128,9 @@ function showStats(stats) {
 
     // Afficher les statistiques principales
     document.getElementById('totalRows').textContent = stats.total_rows;
+    document.getElementById('totalStFo').textContent = stats.total_st_fo;
     document.getElementById('primaryCount').textContent = stats.primary_count;
     document.getElementById('primaryLabel').textContent = `Nombre de ${stats.primary_label}${stats.primary_count > 1 ? 's' : ''}`;
-    document.getElementById('groupCount').textContent = stats.group_count;
     document.getElementById('fileCount').textContent = stats.file_count;
     document.getElementById('fileSize').textContent = stats.file_size;
 
@@ -148,14 +161,34 @@ function showStats(stats) {
     primaryList.innerHTML = '';
 
     Object.entries(stats.primary_stats)
-        .sort((a, b) => b[1] - a[1]) // Trier par nombre décroissant
-        .forEach(([name, count]) => {
+        .sort((a, b) => {
+            // Trier par nombre de lignes décroissant
+            const aLines = typeof a[1] === 'object' ? a[1].lines : a[1];
+            const bLines = typeof b[1] === 'object' ? b[1].lines : b[1];
+            return bLines - aLines;
+        })
+        .forEach(([name, data]) => {
             const primaryItem = document.createElement('div');
             primaryItem.className = 'primary-item';
-            primaryItem.innerHTML = `
-                <span class="primary-name">${name}</span>
-                <span class="primary-count">${count} ligne${count > 1 ? 's' : ''}</span>
-            `;
+
+            if (typeof data === 'object') {
+                // Nouvelles statistiques détaillées
+                primaryItem.innerHTML = `
+                    <span class="primary-name">${name}</span>
+                    <span class="primary-count">
+                        ${data.lines} ligne${data.lines > 1 ? 's' : ''} |
+                        ${data.st_fo} ST FO |
+                        ${data.files} fichier${data.files > 1 ? 's' : ''}
+                    </span>
+                `;
+            } else {
+                // Anciennes statistiques simples (pour compatibilité)
+                primaryItem.innerHTML = `
+                    <span class="primary-name">${name}</span>
+                    <span class="primary-count">${data} ligne${data > 1 ? 's' : ''}</span>
+                `;
+            }
+
             primaryList.appendChild(primaryItem);
         });
 
@@ -164,8 +197,8 @@ function showStats(stats) {
     const sortTitle = document.getElementById('sortTitle');
     const sortCard = sortList.closest('.detail-card');
 
-    if (stats.sort_column === 'DR IAM') {
-        // Masquer complètement la section de tri si on trie par DR IAM (éviter la duplication)
+    if (stats.sort_column === 'DR IAM' || stats.sort_column === 'ville' || stats.sort_column === 'ST FO') {
+        // Masquer complètement la section de tri pour éviter la duplication
         sortCard.style.display = 'none';
         sortCard.style.visibility = 'hidden';
         sortCard.style.height = '0';
@@ -195,24 +228,43 @@ function showStats(stats) {
     }
 }
 
-function showResults(files, sortColumn) {
+function showResults(files, sortColumn, filesDetails = null) {
     results.style.display = 'block';
 
     filesList.innerHTML = '';
 
-    files.forEach(filename => {
-        const fileItem = document.createElement('div');
-        fileItem.className = 'file-item';
+    if (filesDetails && filesDetails.length > 0) {
+        // Utiliser les détails des fichiers avec nombre de lignes
+        filesDetails.forEach(fileInfo => {
+            const fileItem = document.createElement('div');
+            fileItem.className = 'file-item';
 
-        fileItem.innerHTML = `
-            <span>📄 ${filename}</span>
-            <a href="/download/${encodeURIComponent(filename)}/" class="btn-download" download>
-                Télécharger
-            </a>
-        `;
+            fileItem.innerHTML = `
+                <span>📄 ${fileInfo.filename}</span>
+                <span class="file-lines">${fileInfo.lines} ligne${fileInfo.lines > 1 ? 's' : ''}</span>
+                <a href="/download/${encodeURIComponent(fileInfo.filename)}/" class="btn-download" download>
+                    Télécharger
+                </a>
+            `;
 
-        filesList.appendChild(fileItem);
-    });
+            filesList.appendChild(fileItem);
+        });
+    } else {
+        // Fallback pour compatibilité (ancien format)
+        files.forEach(filename => {
+            const fileItem = document.createElement('div');
+            fileItem.className = 'file-item';
+
+            fileItem.innerHTML = `
+                <span>📄 ${filename}</span>
+                <a href="/download/${encodeURIComponent(filename)}/" class="btn-download" download>
+                    Télécharger
+                </a>
+            `;
+
+            filesList.appendChild(fileItem);
+        });
+    }
 }
 
 function showError(message) {
@@ -232,7 +284,111 @@ function hideAllSections() {
 function resetForm() {
     removeFile();
     hideAllSections();
+    resetVisitFields();
 }
+
+// Validation des champs de visite avec feedback visuel
+function validateVisitFields(dateDebut, dateFin, objetVisite) {
+    let isValid = true;
+
+    // Réinitialiser les classes de validation
+    document.querySelectorAll('.field-group').forEach(group => {
+        group.classList.remove('valid', 'invalid');
+    });
+
+    // Validation des dates
+    if (dateDebut && dateFin) {
+        if (dateDebut > dateFin) {
+            showError('La date de début ne peut pas être postérieure à la date de fin');
+            // Marquer les champs de date comme invalides
+            document.getElementById('dateDebut').parentElement.classList.add('invalid');
+            document.getElementById('dateFin').parentElement.classList.add('invalid');
+            isValid = false;
+        } else {
+            // Marquer les champs de date comme valides
+            document.getElementById('dateDebut').parentElement.classList.add('valid');
+            document.getElementById('dateFin').parentElement.classList.add('valid');
+        }
+    }
+
+    // Validation de l'objet de visite (optionnel mais feedback visuel)
+    if (objetVisite && objetVisite.trim().length > 0) {
+        document.getElementById('objetVisite').parentElement.classList.add('valid');
+    }
+
+    return isValid;
+}
+
+// Réinitialiser les champs de visite
+function resetVisitFields() {
+    document.getElementById('dateDebut').value = '';
+    document.getElementById('dateFin').value = '';
+    document.getElementById('objetVisite').value = '';
+
+    document.querySelectorAll('.field-group').forEach(group => {
+        group.classList.remove('valid', 'invalid');
+    });
+}
+
+// Validation en temps réel des champs de visite
+function setupVisitFieldsValidation() {
+    const dateDebut = document.getElementById('dateDebut');
+    const dateFin = document.getElementById('dateFin');
+    const objetVisite = document.getElementById('objetVisite');
+
+    // Validation en temps réel des dates
+    function validateDates() {
+        const debut = dateDebut.value;
+        const fin = dateFin.value;
+
+        // Réinitialiser les classes pour les champs de date
+        const dateFields = [
+            document.getElementById('dateDebut').parentElement,
+            document.getElementById('dateFin').parentElement
+        ];
+
+        dateFields.forEach(group => {
+            group.classList.remove('valid', 'invalid');
+        });
+
+        if (debut && fin) {
+            if (debut > fin) {
+                dateFields.forEach(group => {
+                    group.classList.add('invalid');
+                });
+            } else {
+                dateFields.forEach(group => {
+                    group.classList.add('valid');
+                });
+            }
+        } else if (debut || fin) {
+            dateFields.forEach(group => {
+                group.classList.add('valid');
+            });
+        }
+    }
+
+    // Validation en temps réel de l'objet de visite
+    function validateObjet() {
+        const objetField = document.getElementById('objetVisite').parentElement;
+        objetField.classList.remove('valid', 'invalid');
+
+        if (objetVisite.value && objetVisite.value.trim().length > 0) {
+            objetField.classList.add('valid');
+        }
+    }
+
+    // Événements
+    dateDebut.addEventListener('change', validateDates);
+    dateFin.addEventListener('change', validateDates);
+    objetVisite.addEventListener('input', validateObjet);
+    objetVisite.addEventListener('blur', validateObjet);
+}
+
+// Initialiser la validation au chargement de la page
+document.addEventListener('DOMContentLoaded', function() {
+    setupVisitFieldsValidation();
+});
 
 // Ajouter un bouton pour recommencer dans les résultats
 document.addEventListener('DOMContentLoaded', () => {

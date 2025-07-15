@@ -208,6 +208,206 @@ main {
     transform: translate(-50%, -50%);
 }
 
+/* Section des informations de visite - Design professionnel */
+.visit-info-section {
+    margin: 30px 0;
+    padding: 28px;
+    background: linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%);
+    border-radius: 16px;
+    border: 1px solid #e1e8ff;
+    box-shadow: 0 4px 20px rgba(79, 172, 254, 0.08);
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.visit-info-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+    border-radius: 16px 16px 0 0;
+}
+
+.visit-info-section:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(79, 172, 254, 0.12);
+}
+
+.visit-info-section h3 {
+    color: #2d3748;
+    margin-bottom: 24px;
+    font-size: 1.2em;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    letter-spacing: -0.02em;
+}
+
+.visit-info-section h3::after {
+    content: '';
+    flex: 1;
+    height: 2px;
+    background: linear-gradient(90deg, #4facfe 0%, transparent 100%);
+    border-radius: 1px;
+}
+
+.visit-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items: end;
+}
+
+.field-group {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+.field-group:last-child {
+    grid-column: 1 / -1;
+    margin-top: 8px;
+}
+
+.field-group label {
+    color: #4a5568;
+    font-size: 0.95em;
+    font-weight: 600;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: color 0.3s ease;
+}
+
+.field-group label::before {
+    content: '';
+    width: 4px;
+    height: 4px;
+    background: #4facfe;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+}
+
+.field-group:focus-within label {
+    color: #2d3748;
+}
+
+.field-group:focus-within label::before {
+    background: #00f2fe;
+    transform: scale(1.5);
+}
+
+.date-input, .text-input {
+    padding: 14px 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    font-size: 0.95em;
+    font-family: 'Arial Narrow', Arial, sans-serif;
+    background: #ffffff;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.date-input:hover, .text-input:hover {
+    border-color: #cbd5e0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    transform: translateY(-1px);
+}
+
+.date-input:focus, .text-input:focus {
+    outline: none;
+    border-color: #4facfe;
+    box-shadow: 0 0 0 4px rgba(79, 172, 254, 0.15), 0 4px 12px rgba(79, 172, 254, 0.1);
+    transform: translateY(-2px);
+}
+
+.text-input {
+    width: 100%;
+    resize: vertical;
+    min-height: 48px;
+}
+
+.text-input::placeholder {
+    color: #a0aec0;
+    font-style: italic;
+    transition: color 0.3s ease;
+}
+
+.text-input:focus::placeholder {
+    color: #cbd5e0;
+}
+
+/* Icônes supprimées pour les champs */
+
+/* Animation d'apparition */
+.visit-info-section {
+    animation: slideInUp 0.6s ease-out;
+}
+
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* États de validation */
+.field-group.valid .date-input,
+.field-group.valid .text-input {
+    border-color: #48bb78;
+    box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.1);
+}
+
+.field-group.invalid .date-input,
+.field-group.invalid .text-input {
+    border-color: #f56565;
+    box-shadow: 0 0 0 3px rgba(245, 101, 101, 0.1);
+}
+
+/* Responsive pour les champs de visite */
+@media (max-width: 768px) {
+    .visit-info-section {
+        margin: 20px 0;
+        padding: 20px;
+    }
+
+    .visit-fields {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .field-group:last-child {
+        grid-column: 1;
+        margin-top: 4px;
+    }
+
+    .date-input, .text-input {
+        padding: 12px 14px;
+        font-size: 16px; /* Évite le zoom sur iOS */
+    }
+}
+
+@media (max-width: 480px) {
+    .visit-info-section h3 {
+        font-size: 1.1em;
+    }
+
+    .visit-fields {
+        gap: 14px;
+    }
+}
+
 .btn-process {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
@@ -218,6 +418,7 @@ main {
     cursor: pointer;
     transition: transform 0.2s ease;
     width: 100%;
+    margin-top: 10px;
 }
 
 .btn-process:hover {
@@ -328,6 +529,10 @@ main {
     border-radius: 15px;
     font-size: 0.9em;
     font-weight: bold;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 300px;
 }
 
 .loading {
@@ -375,6 +580,24 @@ main {
     justify-content: space-between;
     align-items: center;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    gap: 10px;
+}
+
+.file-lines {
+    background: #27ae60;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 15px;
+    font-size: 0.85em;
+    font-weight: 500;
+    white-space: nowrap;
+    margin-left: auto;
+    border: 1px solid #219a52;
+    transition: background 0.3s ease;
+}
+
+.file-lines:hover {
+    background: #219a52;
 }
 
 .btn-download {

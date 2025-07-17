@@ -5,9 +5,7 @@ from django.conf import settings
 import pandas as pd
 import os
 from pptx import Presentation
-from pptx.util import Inches, Pt, Cm
-from pptx.dml.color import RGBColor
-from pptx.enum.text import PP_ALIGN
+from pptx.util import Inches
 
 def index(request):
     """Page principale avec l'interface de upload"""
@@ -50,11 +48,7 @@ def upload_file(request):
 
         # Lire le fichier Excel
         df = pd.read_excel(file)
-
-        # Debug: afficher les colonnes disponibles
-        print(f"Colonnes disponibles dans le fichier: {list(df.columns)}")
-        print(f"Forme du DataFrame: {df.shape}")
-        print(f"Premières lignes:\n{df.head()}")
+        print('Colonnes Excel:', list(df.columns))
 
         # Normaliser les noms de colonnes (supprimer espaces en début/fin et convertir en minuscules pour comparaison)
         df.columns = df.columns.str.strip()
@@ -71,10 +65,12 @@ def upload_file(request):
             'code site': ['codesite'],
             'ST FO': ['stfo'],
             'contact ERPT': ['contacterpt'],
+            'Contact IAM': ['contactiam', 'contact iam', 'contact_iam'],
             'DR IAM': ['driam'],
             'ville': ['ville'],
+            'Date TSS': ['datetss', 'date tss', 'date_tss'],
             'X Départ ERPT - Y Départ ERPT': ['xdéparterpt-ydéparterpt', 'xdéparterptydepart'],
-            'X Arrivée ERPT Proposition1 - Y Arrivée': ['xarrivéeerptproposition1-yarrivéeerptproposition1']
+            'X Arrivée ERPT Proposition1 - Y Arrivée ERPT Proposition1': ['xarrivéeerptproposition1-yarrivéeerptproposition1', 'xarriveeerpt-yarriveeerpt']
         }
 
         # Recherche très flexible des colonnes
@@ -221,15 +217,12 @@ def upload_file(request):
 
 
         generated_files = []
-
-        # Générer un PowerPoint pour chaque groupe
+        created_files = []  # Correction pour éviter l'erreur de variable non définie
+        # Générer un PowerPoint pour chaque groupe (ordre d'origine)
         for group_name, group_df in grouped_data:
             ppt_filename = f"{sort_column}_{group_name}.pptx"
             ppt_path = os.path.join(output_dir, ppt_filename)
-
-            # Créer les présentations PowerPoint (peut créer plusieurs fichiers)
-            created_files = create_powerpoint(group_df, ppt_path, group_name, sort_column, date_debut, date_fin, objet_visite)
-            generated_files.extend(created_files)
+            created_files.extend(create_powerpoint(group_df, ppt_path, group_name, sort_column, date_debut, date_fin, objet_visite))
 
         # Extraire les noms de fichiers pour la compatibilité
         file_names = [file_info['filename'] for file_info in generated_files]
@@ -254,17 +247,30 @@ def create_powerpoint(df, output_path, group_name, sort_column, date_debut='', d
     """Crée des présentations PowerPoint à partir des données avec division en fichiers (max 19 lignes par fichier)"""
     from pptx.dml.color import RGBColor
     from pptx.util import Pt, Cm
-    import random
+
 
     # Colonnes finales à afficher dans le PowerPoint
     final_columns = [
         'code site',
         'ST FO',
         'contact ERPT',
+        'Contact IAM',
         'DR IAM',
         'ville',
+        'Date TSS',
         'X Départ ERPT - Y Départ ERPT',
-        'X Arrivée ERPT Proposition1 - Y Arrivée'
+        'X Arrivée ERPT Proposition1 - Y Arrivée ERPT Proposition1'
+    ]
+    display_columns = [
+        'code site',
+        'ST FO',
+        'contact ERPT',
+        'Contact IAM',
+        'DR IAM',
+        'ville',
+        'Date TSS',
+        'X Départ ERPT - Y Départ ERPT',
+        'X Arrivée ERPT - Y Arrivée ERPT'
     ]
 
     # Chemin vers l'image AAA
@@ -276,8 +282,11 @@ def create_powerpoint(df, output_path, group_name, sort_column, date_debut='', d
 
     # Créer les colonnes manquantes avec des valeurs par défaut SEULEMENT si elles n'existent pas
     if 'contact ERPT' not in df_work.columns:
-        # Générer des contacts ERPT basés sur l'index SEULEMENT si la colonne n'existe pas
         df_work['contact ERPT'] = [f"contact{i+1}@erpt.fr" for i in range(len(df_work))]
+    if 'Contact IAM' not in df_work.columns:
+        df_work['Contact IAM'] = ["" for _ in range(len(df_work))]
+    if 'Date TSS' not in df_work.columns:
+        df_work['Date TSS'] = ["" for _ in range(len(df_work))]
 
     # Gérer les colonnes X-Y (soit séparées, soit déjà combinées)
     # Vérifier si les colonnes sont déjà combinées dans le fichier Excel
@@ -300,7 +309,7 @@ def create_powerpoint(df, output_path, group_name, sort_column, date_debut='', d
         # Nettoyer les valeurs NaN et vides
         df_work['X Départ ERPT - Y Départ ERPT'] = df_work['X Départ ERPT - Y Départ ERPT'].fillna("").astype(str)
 
-    if 'X Arrivée ERPT Proposition1 - Y Arrivée' not in df_work.columns:
+    if 'X Arrivée ERPT - Y Arrivée ERPT' not in df_work.columns:
         # Les colonnes ne sont pas encore combinées, essayer de les combiner
         if 'X Arrivée ERPT Proposition1' in df_work.columns and 'Y Arrivée ERPT Proposition1' in df_work.columns:
             combined_arrivee = []
@@ -311,18 +320,18 @@ def create_powerpoint(df, output_path, group_name, sort_column, date_debut='', d
                     combined_arrivee.append(f"{x_val} - {y_val}")
                 else:
                     combined_arrivee.append("")
-            df_work['X Arrivée ERPT Proposition1 - Y Arrivée'] = combined_arrivee
+            df_work['X Arrivée ERPT - Y Arrivée ERPT'] = combined_arrivee
         else:
-            df_work['X Arrivée ERPT Proposition1 - Y Arrivée'] = [""] * len(df_work)
+            df_work['X Arrivée ERPT - Y Arrivée ERPT'] = [""] * len(df_work)
     # Si la colonne existe déjà, s'assurer qu'elle contient des données valides
     else:
         # Nettoyer les valeurs NaN et vides
-        df_work['X Arrivée ERPT Proposition1 - Y Arrivée'] = df_work['X Arrivée ERPT Proposition1 - Y Arrivée'].fillna("").astype(str)
+        df_work['X Arrivée ERPT - Y Arrivée ERPT'] = df_work['X Arrivée ERPT - Y Arrivée ERPT'].fillna("").astype(str)
 
     # Créer les autres colonnes manquantes si nécessaire
     for col in final_columns:
         if col not in df_work.columns:
-            df_work[col] = [""] * len(df_work)
+            df_work[col] = ["" for _ in range(len(df_work))]
 
     # Sélectionner seulement les colonnes finales à afficher dans l'ordre exact
     df_filtered = df_work[final_columns].copy()
@@ -504,10 +513,7 @@ def create_powerpoint(df, output_path, group_name, sort_column, date_debut='', d
                 pass
 
         # Ajouter les informations de visite EN AVANT-PLAN sur l'image AAA
-        print(f"🔍 Debug: date_debut='{date_debut}', date_fin='{date_fin}', objet_visite='{objet_visite}'")
-
         if date_debut or date_fin or objet_visite:
-            print("✅ Ajout des informations de visite en avant-plan")
 
             # Formater les dates au format DD/MM/YYYY
             def format_date(date_str):
@@ -526,8 +532,7 @@ def create_powerpoint(df, output_path, group_name, sort_column, date_debut='', d
             objet_formatted = f'"{objet_visite}"' if objet_visite else '""'
 
             # Créer le texte dans le format exact demandé
-            visit_info_text = f"{date_debut_formatted}         {date_fin_formatted}                                              {objet_formatted}"
-            print(f"📝 Texte à afficher: '{visit_info_text}'")
+            visit_info_text = f"{date_debut_formatted}         {date_fin_formatted}                                           {objet_formatted}"
 
             # Ajouter la zone de texte EN AVANT-PLAN sur l'image AAA
             # Position ajustée : descendre de 0.2cm supplémentaire
@@ -552,19 +557,16 @@ def create_powerpoint(df, output_path, group_name, sort_column, date_debut='', d
                 fill = text_box.fill
                 fill.background()  # Fond transparent
 
-                print("✅ Zone de texte ajoutée avec succès en avant-plan")
-
             except Exception as e:
-                print(f"❌ Erreur lors de l'ajout de la zone de texte: {e}")
-        else:
-            print("⚠️ Aucune information de visite à afficher")
+                # Si erreur avec la zone de texte, continuer sans
+                pass
 
         # Ajouter le tableau en dessous de l'image pour ce chunk
         rows = len(chunk_data) + 1  # +1 pour l'en-tête
         cols = len(final_columns)
 
         # Calculer la largeur totale nécessaire (somme des largeurs de colonnes)
-        total_width_cm = 1.8 + 2.4 + 3.7 + 2.6 + 2.8 + 6.2 + 4.8  # = 24.3 cm
+        total_width_cm = 1.8 + 2.3 + 3.4 + 3.4 + 2.5 + 2.5 + 2.4 + 3.0 + 3.0  # = 28.0 cm
 
         # Positionner le tableau DIRECTEMENT en dessous de l'image
         # (les informations de visite sont maintenant en avant-plan sur l'image)
@@ -579,7 +581,7 @@ def create_powerpoint(df, output_path, group_name, sort_column, date_debut='', d
         table = data_slide.shapes.add_table(rows, cols, left, top, width, height).table
 
         # En-têtes avec police Arial Narrow
-        for i, column in enumerate(final_columns):
+        for i, column in enumerate(display_columns):
             cell = table.cell(0, i)
             cell.text = str(column)
 
@@ -598,11 +600,37 @@ def create_powerpoint(df, output_path, group_name, sort_column, date_debut='', d
 
             # Couleur de fond pour l'en-tête
             cell.fill.solid()
-            cell.fill.fore_color.rgb = RGBColor(68, 114, 196)  # Bleu
+            cell.fill.fore_color.rgb = RGBColor(0xFF, 0x68, 0x00)  # Orange vif (ff6800)
 
         # Données avec police Arial Narrow (utiliser chunk_data au lieu de df_filtered)
         for i, (_, row) in enumerate(chunk_data.iterrows(), 1):
             for j, value in enumerate(row):
+                # Format spécial pour les deux dernières colonnes (coordonnées)
+                if final_columns[j] in [
+                    'X Départ ERPT - Y Départ ERPT',
+                    'X Arrivée ERPT Proposition1 - Y Arrivée ERPT Proposition1'
+                ]:
+                    try:
+                        if isinstance(value, str):
+                            # On accepte les séparateurs virgule, espace ou tiret
+                            for sep in [',', ' - ', ' ']:
+                                if sep in value:
+                                    parts = [p.strip() for p in value.split(sep)]
+                                    break
+                            else:
+                                parts = [value.strip()]
+                            formatted_parts = []
+                            for part in parts:
+                                if part:
+                                    try:
+                                        formatted_parts.append(f"{float(part):.5f}")
+                                    except Exception:
+                                        formatted_parts.append(part)
+                            value = ', '.join(formatted_parts)
+                        elif value != "":
+                            value = f"{float(value):.5f}"
+                    except Exception:
+                        pass
                 cell = table.cell(i, j)
                 cell.text = str(value) if pd.notna(value) and str(value) != "" else ""
 
@@ -620,21 +648,24 @@ def create_powerpoint(df, output_path, group_name, sort_column, date_debut='', d
                 # Couleur alternée pour les lignes
                 if i % 2 == 0:
                     cell.fill.solid()
-                    cell.fill.fore_color.rgb = RGBColor(242, 242, 242)  # Gris clair
+                    cell.fill.fore_color.rgb = RGBColor(0xFF, 0xD4, 0xB9)  # Orange clair (ffd4b9)
+                else:
+                    cell.fill.solid()
+                    cell.fill.fore_color.rgb = RGBColor(0xFF, 0xFF, 0xFF)  # Blanc (ffffff)
 
-        # Largeurs de colonnes spécifiées en centimètres (nouvelles spécifications)
+        # Largeurs de colonnes spécifiées en centimètres selon la nouvelle demande
         from pptx.util import Cm
-
         column_widths = [
-            Cm(1.8),   # colonne 1: code site - 1,8 cm
+            Cm(1.7),   # colonne 1: code site - 1,7 cm
             Cm(2.4),   # colonne 2: ST FO - 2,4 cm
-            Cm(3.7),   # colonne 3: contact ERPT - 3,7 cm
-            Cm(2.6),   # colonne 4: DR IAM - 2,6 cm
-            Cm(2.8),   # colonne 5: ville - 2,8 cm
-            Cm(6.2),   # colonne 6: X Départ ERPT - Y Départ ERPT - 6,2 cm
-            Cm(4.8)    # colonne 7: X Arrivée ERPT Proposition1 - Y Arrivée - 4,8 cm
+            Cm(3.1),   # colonne 3: contact ERPT - 3,1 cm
+            Cm(3.1),   # colonne 4: Contact IAM - 3,1 cm
+            Cm(2.5),   # colonne 5: DR IAM - 2,5 cm
+            Cm(2.5),   # colonne 6: ville - 2,5 cm
+            Cm(2.3),   # colonne 7: Date TSS - 2,3 cm
+            Cm(2.8),   # colonne 8: X Départ ERPT - Y Départ ERPT - 2,8 cm
+            Cm(2.8)    # colonne 9: X Arrivée ERPT Proposition1 - Y Arrivée - 2,8 cm
         ]
-
         # Appliquer les largeurs aux colonnes
         for i, width in enumerate(column_widths):
             if i < len(table.columns):

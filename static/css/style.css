@@ -269,7 +269,7 @@ main {
     position: relative;
 }
 
-/* Tous les champs sont maintenant sur une seule colonne */
+
 
 .field-group label {
     color: #4a5568;
@@ -341,7 +341,7 @@ main {
     color: #cbd5e0;
 }
 
-/* Icônes supprimées pour les champs */
+
 
 /* Animation d'apparition */
 .visit-info-section {

@@ -200,8 +200,12 @@ def upload_file(request):
             'file_size': file_size_display
         }
 
+        # Vérification des colonnes juste avant le groupby
+        print('Colonnes du DataFrame juste avant groupby:', list(df.columns))
+        print('Colonne de tri demandée:', sort_column)
         # Grouper les données par la colonne de tri
         grouped_data = df.groupby(sort_column)
+        print('Groupes trouvés pour le tri:', list(grouped_data.groups.keys()))
 
         # Créer un dossier temporaire pour les fichiers PowerPoint
         output_dir = os.path.join(settings.MEDIA_ROOT, 'generated_ppts')
@@ -220,21 +224,17 @@ def upload_file(request):
         created_files = []  # Correction pour éviter l'erreur de variable non définie
         # Générer un PowerPoint pour chaque groupe (ordre d'origine)
         for group_name, group_df in grouped_data:
+            print('Génération pour le groupe:', group_name, 'lignes:', len(group_df))
             ppt_filename = f"{sort_column}_{group_name}.pptx"
             ppt_path = os.path.join(output_dir, ppt_filename)
             created_files.extend(create_powerpoint(group_df, ppt_path, group_name, sort_column, date_debut, date_fin, objet_visite))
 
-        # Extraire les noms de fichiers pour la compatibilité
-        file_names = [file_info['filename'] for file_info in generated_files]
-
-        # Ajouter le nombre de fichiers générés aux statistiques
-        stats['file_count'] = len(generated_files)
-
+        # Après la génération des fichiers
         return JsonResponse({
             'success': True,
-            'message': f'{len(generated_files)} fichiers PowerPoint générés',
-            'files': file_names,
-            'files_details': generated_files,  # Nouvelle clé avec détails
+            'message': f'{len(created_files)} fichiers PowerPoint générés',
+            'files': [file_info['filename'] for file_info in created_files],
+            'files_details': created_files,  # Clé essentielle pour l'affichage côté frontend
             'stats': stats
         })
 
@@ -695,6 +695,7 @@ def create_powerpoint(df, output_path, group_name, sort_column, date_debut='', d
         })
 
     # Retourner la liste des fichiers créés avec détails
+    print('Fichiers créés pour le groupe', group_name, ':', created_files)
     return created_files
 
 def download_file(request, filename):

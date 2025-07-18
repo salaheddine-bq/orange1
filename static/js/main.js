@@ -126,12 +126,16 @@ function processFile() {
 function showStats(stats) {
     statsSection.style.display = 'block';
 
+    // Log pour diagnostiquer la valeur reçue
+    console.log('Valeur reçue pour file_count:', stats.file_count);
+    // Forcer la mise à jour de la case Fichiers générés
+    document.getElementById('fileCount').textContent = stats.file_count || 0;
+
     // Afficher les statistiques principales
     document.getElementById('totalRows').textContent = stats.total_rows;
     document.getElementById('totalStFo').textContent = stats.total_st_fo;
     document.getElementById('primaryCount').textContent = stats.primary_count;
     document.getElementById('primaryLabel').textContent = `Nombre de ${stats.primary_label}${stats.primary_count > 1 ? 's' : ''}`;
-    document.getElementById('fileCount').textContent = stats.file_count;
     document.getElementById('fileSize').textContent = stats.file_size;
 
     // Gérer l'affichage des détails selon show_details

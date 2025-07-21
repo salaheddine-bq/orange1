@@ -230,6 +230,10 @@ def upload_file(request):
             created_files.extend(create_powerpoint(group_df, ppt_path, group_name, sort_column, date_debut, date_fin, objet_visite))
 
         # Après la génération des fichiers
+        # Diagnostic : afficher le contenu de created_files
+        print('created_files pour le calcul du total :', created_files)
+        # Afficher le nombre total de fichiers PowerPoint générés
+        stats['file_count'] = len(created_files)
         return JsonResponse({
             'success': True,
             'message': f'{len(created_files)} fichiers PowerPoint générés',

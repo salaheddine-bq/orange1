@@ -21,7 +21,11 @@ def upload_file(request):
         return JsonResponse({'error': 'Aucun fichier fourni'}, status=400)
 
     file = request.FILES['file']
-    sort_column = request.POST.get('sort_column', 'code site')
+    project_type = request.POST.get('project_type', 'FTTS_BtoB')
+    sort_column = request.POST.get('sort_column', 'code site ')
+
+    # DEBUG: Vérifier le type de projet reçu
+    print(f"🔍 DEBUG: project_type reçu = '{project_type}'")
 
     # Récupérer les informations de visite
     date_debut = request.POST.get('date_debut', '')
@@ -111,6 +115,12 @@ def upload_file(request):
         # Statistiques par colonne de tri
         sort_stats = df[sort_column].value_counts().to_dict()
 
+        # Déterminer le nombre maximum de lignes selon le type de projet
+        if project_type == 'FTTH':
+            max_lines_per_file = 12
+        else:  # FTTS_BtoB par défaut
+            max_lines_per_file = 19
+
         # Adapter les statistiques selon la colonne choisie avec détails enrichis
         if sort_column == 'DR IAM':
             # Pour DR IAM : afficher DR stats avec ST FO et fichiers
@@ -119,8 +129,8 @@ def upload_file(request):
                 dr_data = df[df['DR IAM'] == dr_name]
                 lines_count = len(dr_data)
                 st_fo_count = len(dr_data['ST FO'].unique())
-                # Estimer le nombre de fichiers (basé sur 19 lignes max par fichier)
-                files_count = max(1, (lines_count + 18) // 19)  # Arrondi vers le haut
+                # Estimer le nombre de fichiers selon le type de projet
+                files_count = max(1, (lines_count + max_lines_per_file - 1) // max_lines_per_file)  # Arrondi vers le haut
                 primary_stats[dr_name] = {
                     'lines': lines_count,
                     'st_fo': st_fo_count,
@@ -137,8 +147,8 @@ def upload_file(request):
                 ville_data = df[df['ville'] == ville_name]
                 lines_count = len(ville_data)
                 st_fo_count = len(ville_data['ST FO'].unique())
-                # Estimer le nombre de fichiers (basé sur 19 lignes max par fichier)
-                files_count = max(1, (lines_count + 18) // 19)  # Arrondi vers le haut
+                # Estimer le nombre de fichiers selon le type de projet
+                files_count = max(1, (lines_count + max_lines_per_file - 1) // max_lines_per_file)  # Arrondi vers le haut
                 primary_stats[ville_name] = {
                     'lines': lines_count,
                     'st_fo': st_fo_count,
@@ -156,8 +166,8 @@ def upload_file(request):
                 lines_count = len(st_fo_data)
                 # Pour ST FO, le nombre de ST FO est toujours 1
                 st_fo_count = 1
-                # Estimer le nombre de fichiers (basé sur 19 lignes max par fichier)
-                files_count = max(1, (lines_count + 18) // 19)  # Arrondi vers le haut
+                # Estimer le nombre de fichiers selon le type de projet
+                files_count = max(1, (lines_count + max_lines_per_file - 1) // max_lines_per_file)  # Arrondi vers le haut
                 primary_stats[st_fo_name] = {
                     'lines': lines_count,
                     'st_fo': st_fo_count,
@@ -222,12 +232,39 @@ def upload_file(request):
 
         generated_files = []
         created_files = []  # Correction pour éviter l'erreur de variable non définie
-        # Générer un PowerPoint pour chaque groupe (ordre d'origine)
-        for group_name, group_df in grouped_data:
-            print('Génération pour le groupe:', group_name, 'lignes:', len(group_df))
-            ppt_filename = f"{sort_column}_{group_name}.pptx"
-            ppt_path = os.path.join(output_dir, ppt_filename)
-            created_files.extend(create_powerpoint(group_df, ppt_path, group_name, sort_column, date_debut, date_fin, objet_visite))
+
+        if project_type == 'FTTH':
+            # Pour FTTH : Traiter chaque groupe avec division stricte à 12 lignes
+            print(f"🎯 FTTH MODE ACTIVÉ - Division à 12 lignes")
+            for group_name, group_df in grouped_data:
+                print(f'🔧 Génération FTTH pour le groupe: {group_name}, lignes: {len(group_df)}')
+
+                # Diviser le groupe en chunks de 12 lignes maximum
+                print(f"📊 Division du groupe {group_name} ({len(group_df)} lignes) en chunks de 12")
+                for i in range(0, len(group_df), 12):
+                    chunk_data = group_df.iloc[i:i + 12].copy()
+                    chunk_number = (i // 12) + 1
+
+                    print(f"   📄 Chunk {chunk_number}: lignes {i+1} à {min(i+12, len(group_df))} ({len(chunk_data)} lignes)")
+
+                    # Nommer le fichier selon le nombre de chunks
+                    if len(group_df) <= 12:
+                        ppt_filename = f"{sort_column}_{group_name}.pptx"
+                        chunk_name = group_name
+                    else:
+                        ppt_filename = f"{sort_column}_{group_name} (partie {chunk_number}).pptx"
+                        chunk_name = f"{group_name} (partie {chunk_number})"
+
+                    print(f"   📁 Création fichier: {ppt_filename}")
+                    ppt_path = os.path.join(output_dir, ppt_filename)
+                    created_files.extend(create_powerpoint(chunk_data, ppt_path, chunk_name, sort_column, project_type, date_debut, date_fin, objet_visite))
+        else:
+            # Pour FTTS_BtoB : Logique existante avec optimisation ST FO
+            for group_name, group_df in grouped_data:
+                print('Génération FTTS/BtoB pour le groupe:', group_name, 'lignes:', len(group_df))
+                ppt_filename = f"{sort_column}_{group_name}.pptx"
+                ppt_path = os.path.join(output_dir, ppt_filename)
+                created_files.extend(create_powerpoint(group_df, ppt_path, group_name, sort_column, project_type, date_debut, date_fin, objet_visite))
 
         # Après la génération des fichiers
         # Diagnostic : afficher le contenu de created_files
@@ -247,11 +284,16 @@ def upload_file(request):
 
 
 
-def create_powerpoint(df, output_path, group_name, sort_column, date_debut='', date_fin='', objet_visite=''):
-    """Crée des présentations PowerPoint à partir des données avec division en fichiers (max 19 lignes par fichier)"""
+def create_powerpoint(df, output_path, group_name, sort_column, project_type, date_debut='', date_fin='', objet_visite=''):
+    """Crée des présentations PowerPoint à partir des données avec division en fichiers"""
     from pptx.dml.color import RGBColor
     from pptx.util import Pt, Cm
 
+    # Déterminer le nombre maximum de lignes selon le type de projet
+    if project_type == 'FTTH':
+        max_lines_per_file = 12
+    else:  # FTTS_BtoB par défaut
+        max_lines_per_file = 19
 
     # Colonnes finales à afficher dans le PowerPoint
     final_columns = [
@@ -344,99 +386,109 @@ def create_powerpoint(df, output_path, group_name, sort_column, date_debut='', d
     for col in df_filtered.columns:
         df_filtered[col] = df_filtered[col].fillna("").astype(str)
 
-    # Appliquer le deuxième tri par ST FO pour diviser en sous-groupes
-    df_filtered = df_filtered.sort_values('ST FO', na_position='last').reset_index(drop=True)
-
-    # Grouper par ST FO (deuxième niveau de tri)
-    st_fo_groups = df_filtered.groupby('ST FO', sort=False)
-
-    # Optimiser la distribution des ST FO dans les chunks
+    # Logique différente selon le type de projet
     chunks = []
     chunk_names = []
 
-    # Collecter tous les groupes ST FO avec leurs tailles
-    st_fo_data_list = []
-    for st_fo_name, st_fo_group in st_fo_groups:
-        st_fo_data_list.append({
-            'name': st_fo_name,
-            'data': st_fo_group.reset_index(drop=True),
-            'size': len(st_fo_group)
-        })
+    if project_type == 'FTTH':
+        # Pour FTTH : Les données sont déjà divisées en chunks de 12 lignes
+        # Traiter directement sans groupement ST FO ni division supplémentaire
+        chunks = [df_filtered.copy()]
+        chunk_names = [group_name]
 
-    # Algorithme d'optimisation pour remplir les chunks
-    current_chunk = pd.DataFrame()
-    current_chunk_st_fo = []
-    remaining_st_fo = st_fo_data_list.copy()
+    else:
+        # Pour FTTS_BtoB : Appliquer la logique d'optimisation ST FO
+        # Appliquer le deuxième tri par ST FO pour diviser en sous-groupes
+        df_filtered = df_filtered.sort_values('ST FO', na_position='last').reset_index(drop=True)
 
-    while remaining_st_fo:
-        current_space = 19 - len(current_chunk)
+        # Grouper par ST FO (deuxième niveau de tri)
+        st_fo_groups = df_filtered.groupby('ST FO', sort=False)
+        # Pour FTTS_BtoB : Logique d'optimisation existante (19 lignes)
+        # Optimiser la distribution des ST FO dans les chunks
 
-        if current_space <= 0:
-            # Chunk plein, le sauvegarder
-            chunks.append(current_chunk.copy())
+        # Collecter tous les groupes ST FO avec leurs tailles
+        st_fo_data_list = []
+        for st_fo_name, st_fo_group in st_fo_groups:
+            st_fo_data_list.append({
+                'name': st_fo_name,
+                'data': st_fo_group.reset_index(drop=True),
+                'size': len(st_fo_group)
+            })
+
+        # Algorithme d'optimisation pour remplir les chunks
+        current_chunk = pd.DataFrame()
+        current_chunk_st_fo = []
+        remaining_st_fo = st_fo_data_list.copy()
+
+        while remaining_st_fo:
+            current_space = max_lines_per_file - len(current_chunk)
+
+            if current_space <= 0:
+                # Chunk plein, le sauvegarder
+                chunks.append(current_chunk.copy())
+                if len(current_chunk_st_fo) == 1:
+                    chunk_names.append(current_chunk_st_fo[0])
+                else:
+                    chunk_names.append(" + ".join(current_chunk_st_fo))
+
+                # Commencer un nouveau chunk
+                current_chunk = pd.DataFrame()
+                current_chunk_st_fo = []
+                continue
+
+            # Chercher le meilleur ST FO à ajouter
+            best_fit = None
+            best_index = -1
+
+            for i, st_fo_item in enumerate(remaining_st_fo):
+                if st_fo_item['size'] <= current_space:
+                    # Ce ST FO peut entrer entièrement
+                    if best_fit is None or st_fo_item['size'] > best_fit['size']:
+                        best_fit = st_fo_item
+                        best_index = i
+
+            if best_fit:
+                # Ajouter le ST FO entier au chunk
+                if len(current_chunk) == 0:
+                    current_chunk = best_fit['data'].copy()
+                else:
+                    current_chunk = pd.concat([current_chunk, best_fit['data']], ignore_index=True)
+                current_chunk_st_fo.append(best_fit['name'])
+                remaining_st_fo.pop(best_index)
+            else:
+                # Aucun ST FO ne peut entrer entièrement, prendre une partie du plus grand
+                if remaining_st_fo:
+                    largest_st_fo = max(remaining_st_fo, key=lambda x: x['size'])
+                    largest_index = remaining_st_fo.index(largest_st_fo)
+
+                    # Prendre autant de lignes que possible
+                    lines_to_take = min(current_space, largest_st_fo['size'])
+                    partial_data = largest_st_fo['data'].iloc[:lines_to_take].copy()
+
+                    if len(current_chunk) == 0:
+                        current_chunk = partial_data
+                    else:
+                        current_chunk = pd.concat([current_chunk, partial_data], ignore_index=True)
+
+                    # Mettre à jour le nom du chunk
+                    if lines_to_take == largest_st_fo['size']:
+                        # ST FO entier utilisé
+                        current_chunk_st_fo.append(largest_st_fo['name'])
+                        remaining_st_fo.pop(largest_index)
+                    else:
+                        # ST FO partiellement utilisé
+                        current_chunk_st_fo.append(f"{largest_st_fo['name']} (partiel)")
+                        # Mettre à jour le ST FO restant
+                        remaining_st_fo[largest_index]['data'] = largest_st_fo['data'].iloc[lines_to_take:].reset_index(drop=True)
+                        remaining_st_fo[largest_index]['size'] = len(remaining_st_fo[largest_index]['data'])
+
+        # Ajouter le dernier chunk s'il n'est pas vide
+        if len(current_chunk) > 0:
+            chunks.append(current_chunk)
             if len(current_chunk_st_fo) == 1:
                 chunk_names.append(current_chunk_st_fo[0])
             else:
                 chunk_names.append(" + ".join(current_chunk_st_fo))
-
-            # Commencer un nouveau chunk
-            current_chunk = pd.DataFrame()
-            current_chunk_st_fo = []
-            continue
-
-        # Chercher le meilleur ST FO à ajouter
-        best_fit = None
-        best_index = -1
-
-        for i, st_fo_item in enumerate(remaining_st_fo):
-            if st_fo_item['size'] <= current_space:
-                # Ce ST FO peut entrer entièrement
-                if best_fit is None or st_fo_item['size'] > best_fit['size']:
-                    best_fit = st_fo_item
-                    best_index = i
-
-        if best_fit:
-            # Ajouter le ST FO entier au chunk
-            if len(current_chunk) == 0:
-                current_chunk = best_fit['data'].copy()
-            else:
-                current_chunk = pd.concat([current_chunk, best_fit['data']], ignore_index=True)
-            current_chunk_st_fo.append(best_fit['name'])
-            remaining_st_fo.pop(best_index)
-        else:
-            # Aucun ST FO ne peut entrer entièrement, prendre une partie du plus grand
-            if remaining_st_fo:
-                largest_st_fo = max(remaining_st_fo, key=lambda x: x['size'])
-                largest_index = remaining_st_fo.index(largest_st_fo)
-
-                # Prendre autant de lignes que possible
-                lines_to_take = min(current_space, largest_st_fo['size'])
-                partial_data = largest_st_fo['data'].iloc[:lines_to_take].copy()
-
-                if len(current_chunk) == 0:
-                    current_chunk = partial_data
-                else:
-                    current_chunk = pd.concat([current_chunk, partial_data], ignore_index=True)
-
-                # Mettre à jour le nom du chunk
-                if lines_to_take == largest_st_fo['size']:
-                    # ST FO entier utilisé
-                    current_chunk_st_fo.append(largest_st_fo['name'])
-                    remaining_st_fo.pop(largest_index)
-                else:
-                    # ST FO partiellement utilisé
-                    current_chunk_st_fo.append(f"{largest_st_fo['name']} (partiel)")
-                    # Mettre à jour le ST FO restant
-                    remaining_st_fo[largest_index]['data'] = largest_st_fo['data'].iloc[lines_to_take:].reset_index(drop=True)
-                    remaining_st_fo[largest_index]['size'] = len(remaining_st_fo[largest_index]['data'])
-
-    # Ajouter le dernier chunk s'il n'est pas vide
-    if len(current_chunk) > 0:
-        chunks.append(current_chunk)
-        if len(current_chunk_st_fo) == 1:
-            chunk_names.append(current_chunk_st_fo[0])
-        else:
-            chunk_names.append(" + ".join(current_chunk_st_fo))
 
     # Créer plusieurs fichiers PowerPoint si nécessaire
     created_files = []
@@ -569,8 +621,13 @@ def create_powerpoint(df, output_path, group_name, sort_column, date_debut='', d
         rows = len(chunk_data) + 1  # +1 pour l'en-tête
         cols = len(final_columns)
 
-        # Calculer la largeur totale nécessaire (somme des largeurs de colonnes)
-        total_width_cm = 1.8 + 2.3 + 3.4 + 3.4 + 2.5 + 2.5 + 2.4 + 3.0 + 3.0  # = 28.0 cm
+        # Calculer la largeur totale nécessaire selon le type de projet
+        if project_type == 'FTTH':
+            # FTTH: 3.5 + 2.0 + 2.2 + 2.2 + 2.5 + 2.5 + 2.5 + 2.8 + 2.8 = 23.0 cm
+            total_width_cm = 23.0
+        else:
+            # FTTS/BtoB: 1.7 + 2.4 + 3.1 + 3.1 + 2.5 + 2.5 + 2.3 + 2.8 + 2.8 = 23.2 cm
+            total_width_cm = 23.2
 
         # Positionner le tableau DIRECTEMENT en dessous de l'image
         # (les informations de visite sont maintenant en avant-plan sur l'image)
@@ -657,19 +714,35 @@ def create_powerpoint(df, output_path, group_name, sort_column, date_debut='', d
                     cell.fill.solid()
                     cell.fill.fore_color.rgb = RGBColor(0xFF, 0xFF, 0xFF)  # Blanc (ffffff)
 
-        # Largeurs de colonnes spécifiées en centimètres selon la nouvelle demande
+        # Largeurs de colonnes selon le type de projet
         from pptx.util import Cm
-        column_widths = [
-            Cm(1.7),   # colonne 1: code site - 1,7 cm
-            Cm(2.4),   # colonne 2: ST FO - 2,4 cm
-            Cm(3.1),   # colonne 3: contact ERPT - 3,1 cm
-            Cm(3.1),   # colonne 4: Contact IAM - 3,1 cm
-            Cm(2.5),   # colonne 5: DR IAM - 2,5 cm
-            Cm(2.5),   # colonne 6: ville - 2,5 cm
-            Cm(2.3),   # colonne 7: Date TSS - 2,3 cm
-            Cm(2.8),   # colonne 8: X Départ ERPT - Y Départ ERPT - 2,8 cm
-            Cm(2.8)    # colonne 9: X Arrivée ERPT Proposition1 - Y Arrivée - 2,8 cm
-        ]
+
+        if project_type == 'FTTH':
+            # Dimensions spécifiques pour FTTH (12 lignes par fichier)
+            column_widths = [
+                Cm(3.5),   # colonne 1: code site - 3,5 cm
+                Cm(2.0),   # colonne 2: ST FO - 2,0 cm
+                Cm(2.2),   # colonne 3: contact ERPT - 2,2 cm
+                Cm(2.2),   # colonne 4: Contact IAM - 2,2 cm
+                Cm(2.5),   # colonne 5: DR IAM - 2,5 cm
+                Cm(2.5),   # colonne 6: ville - 2,5 cm
+                Cm(2.5),   # colonne 7: Date TSS - 2,5 cm
+                Cm(2.8),   # colonne 8: X Départ ERPT - Y Départ ERPT - 2,8 cm
+                Cm(2.8)    # colonne 9: X Arrivée ERPT Proposition1 - Y Arrivée - 2,8 cm
+            ]
+        else:
+            # Dimensions pour FTTS et BtoB (19 lignes par fichier)
+            column_widths = [
+                Cm(1.7),   # colonne 1: code site - 1,7 cm
+                Cm(2.4),   # colonne 2: ST FO - 2,4 cm
+                Cm(3.1),   # colonne 3: contact ERPT - 3,1 cm
+                Cm(3.1),   # colonne 4: Contact IAM - 3,1 cm
+                Cm(2.5),   # colonne 5: DR IAM - 2,5 cm
+                Cm(2.5),   # colonne 6: ville - 2,5 cm
+                Cm(2.3),   # colonne 7: Date TSS - 2,3 cm
+                Cm(2.8),   # colonne 8: X Départ ERPT - Y Départ ERPT - 2,8 cm
+                Cm(2.8)    # colonne 9: X Arrivée ERPT Proposition1 - Y Arrivée - 2,8 cm
+            ]
         # Appliquer les largeurs aux colonnes
         for i, width in enumerate(column_widths):
             if i < len(table.columns):

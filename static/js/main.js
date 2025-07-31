@@ -77,6 +77,9 @@ function processFile() {
         return;
     }
 
+    // Récupérer le type de projet sélectionné
+    const projectType = document.querySelector('input[name="projectType"]:checked').value;
+
     const sortColumn = document.querySelector('input[name="sortColumn"]:checked').value;
 
     // Récupérer les informations de visite
@@ -96,6 +99,7 @@ function processFile() {
     // Préparer les données pour l'upload
     const formData = new FormData();
     formData.append('file', selectedFile);
+    formData.append('project_type', projectType);
     formData.append('sort_column', sortColumn);
     formData.append('date_debut', dateDebut);
     formData.append('date_fin', dateFin);
